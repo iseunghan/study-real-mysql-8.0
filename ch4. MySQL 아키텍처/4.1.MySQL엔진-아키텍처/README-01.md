@@ -8,6 +8,7 @@
 ### MySQL 서버 전체 구조
 
 ![](../images/4.1.1.png)
+
 그림 1. MySQL 서버의 전체 구조
 
 ### MySQL 엔진
