@@ -4,19 +4,13 @@
 
 ## MySQL 전체 구조
 
----
 
 ### MySQL 서버 전체 구조
 
----
-
-![그림 1. MySQL 서버의 전체 구조](1%E1%84%8C%E1%85%AE%E1%84%8E%E1%85%A1%208c8035a1fff049fe8b14e406e69d9708/Untitled.png)
-
+![](../images/4.1.1.png)
 그림 1. MySQL 서버의 전체 구조
 
 ### MySQL 엔진
-
----
 
 > 요청된 SQL 문장을 분석 또는 최적화 등 명령 처리 수행
 > 
@@ -29,7 +23,6 @@
 
 ### 스토리지 엔진
 
----
 
 > 실제 디스크 스토리지에 데이터를 저장 또는 읽어오는 기능
 > 
@@ -45,7 +38,6 @@
 
 ### 핸들러 API
 
----
 
 > MySQL 엔진의 쿼리 실행기에서 데이터를 쓰거나 읽을 때,
 각 스토리지 엔진에 쓰기 또는 읽기를 요청하는데 사용되는 API
@@ -58,8 +50,6 @@ mysql> SHOW GLOBAL STATUS LIKE 'Handler%';
 ```
 
 ## MySQL 스레딩 구조
-
----
 
 <aside>
 💡 MySQL 서버는 **스레드 기반** 작동
@@ -77,7 +67,6 @@ FROM performance_schema.threads ORDER BY type, thread_id
 
 ### 포그라운드 스레드 (클라이언트 스레드)
 
----
 
 - 최소한 MySQL 서버에 접속된 **클라이언트의 수**만큼 존재
     - 클라이언트 접속 시, 스레드 캐시에서 확인
@@ -100,7 +89,6 @@ FROM performance_schema.threads ORDER BY type, thread_id
 
 ### 백그라운드 스레드
 
----
 
 - InnoDB 기준 백그라운드 스레드 종류 (MyISAM은 큰 해당 없음)
     - 인서트 버퍼(Insert Buffer)를 병합하는 스레드
@@ -128,11 +116,8 @@ FROM performance_schema.threads ORDER BY type, thread_id
 
 ## 메모리 할당 및 사용 구조
 
----
-
 ### 글로벌 메모리 영역
 
----
 
 - MySQL 서버가 시작되면서 운영체제로부터 할당
     - MySQL의 시스템 변수로 설정해 둔 만큼 OS로부터 메모리 할당
@@ -147,7 +132,6 @@ FROM performance_schema.threads ORDER BY type, thread_id
 
 ### 로컬 메모리 영역 (세션 메모리 영역)
 
----
 
 - 클라이언트 스레드가 사용자 요청 처리를 위해 사용하는 메모리 공간
     - 동어 : 클라이언트 메모리 영역, 로컬 메모리 영역, 세션 메모리 영역
@@ -166,11 +150,8 @@ FROM performance_schema.threads ORDER BY type, thread_id
 
 ## 플러그인 스토리지 엔진 모델
 
----
-
 ### 플러그인
 
----
 
 - 플러그인 형태로 개발/구현해서 사용
     - 스토리지 엔진, 검색어 파서, 사용자 인증 등
