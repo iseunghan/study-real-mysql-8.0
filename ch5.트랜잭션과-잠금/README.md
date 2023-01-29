@@ -244,3 +244,305 @@ mysql> show full processlist;
 - DDL, DML, DCL 용어 참고
 
 [DDL, DML, DCL 이란?](https://velog.io/@ksk5401/DDL-DML-DCL-%EC%9D%B4%EB%9E%80)
+
+# 5.3 InnoDB 스토리지 엔진 잠금
+
+InnoDB 스토리지 엔진은 MySQL과 별개로 잠금을 제공한다.
+
+<aside>
+💡 스토리지 엔진 내부에서 레코드 기반의 잠금 방식을 탑재하고 있다.
+
+</aside>
+
+## 5.3.1 InnoDB 스토리지 엔진의 잠금
+
+InnoDB 스토리지 엔진은 `레코드 기반의 잠금` 을 제공하며, 잠금 정보가 상당히 작은 공간으로 관리되기 때문에 *락 에스컬레이션(레코드 락이 페이지 락으로, 또는 테이블 락으로 레벨업되는 경우)되는 경우는 없다.
+
+또한 InnoDB에서는 특징인 레코드와 레코드 사이의 간격을 잠그는 `갭(GAP) 락`이라는 것이 존재한다.
+
+![Untitled](./images/5.0.png)
+
+점선으로 표시된 것은 존재하지 않는 레코드를 뜻한다.
+
+### 5.3.1.1 레코드 락
+
+레코드 자체만을 잠그는 것을 *레코드 락이라고 한다.
+
+- 레코드 ?
+    
+    레코드란 테이블의 한 데이터의 집합(=튜플, 행, 레코드)를 말한다.
+    
+
+<aside>
+💡 다른 DBMS 레코드 락과 동일한 역할을 하지만, InnoDB 스토리지 엔진은 레코드 자체가 아니라, 
+`인덱스의 레코드`를 잠근다.
+
+</aside>
+
+- 인덱스가 없는 테이블이라면?
+    
+    내부적으로 자동 생성된 인덱스의 레코드를 잠근다.
+    
+
+### 5.3.1.2 갭 락
+
+InnoDB 스토리지 엔진에만 있는 갭 락이라는 개념이다.
+
+갭 락은 레코드를 잠그는게 아닌, 레코드와 레코드 `사이의 그 간격(갭)`을 잠그는 것이다. 레코드와 레코드 사이의 새로운 레코드가 생성되지 않도록 하기 위함이다.
+
+갭 락은 다음에 설명할 넥스트 키 락과 함께 쓰인다.
+
+### 5.3.1.3 넥스트 키 락
+
+레코드 락과 갭 락을 합쳐 놓은 형태의 잠금을 넥스트 키 락(Next Key Lock)이라고 한다.
+
+- innodb_locks_unsafe_for_binlog 기본값: 활성화
+    
+    `innodb_locks_unsafe_for_binlog` 시스템 변수가 비활성화가 되면(0으로 설정) 변경을 위해 검색하는 레코드에는 **넥스트 키 락** 방식으로 잠금이 걸린다. ([공식문서](https://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_locks_unsafe_for_binlog)에는 Deprecated라고 표시되고, 8.0 기준으로는 해당 변수가 사라짐)
+    
+
+하지만, 넥스트 키 락의 주 목적은 소스 서버와 레플리카 서버의 데이터 일치를 위해 사용하므로 레플리카 서버를 사용하지 않는다면 굳이 사용하지 않는 것이 좋다.
+
+아래는 `캡락, 넥스트-키 락`에 대해서 자세하게 설명해준다.
+
+[[MySQL]MySQL 벼락치기(5) - 갭락(Gap Lock)과 넥스트 키 락(Next-Key Lock)](https://idea-sketch.tistory.com/46)
+
+### 5.3.1.4 자동 증가 락
+
+MySQL에서는 자동 증가하는 숫자 값을 추출(채번)하기 위해 `AUTO_INCREMENT`라는 컬럼 속성을 제공한다. 해당 값은 여러 레코드가 동시에 INSERT가 되는 경우 중복되지 않고 순서대로 증가하는 숫자를 가져야 한다.
+
+<aside>
+💡 이를 해결하기 위해 InnoDB 스토리지 엔진 내부적으로 `AUTO_INCREMENT 락` 이라고 하는 테이블 수준의 잠금을 사용한다.
+
+</aside>
+
+`AUTO_INCREMENT` 락은 `INSERT`와 `REPLACE` 쿼리 문장과 같이 새로운 레코드를 저장하는 쿼리에서만 필요하며, `UPDATE`, `DELETE` 쿼리에서는 걸리지 않는다.
+
+특징으로는, 트랜잭션 관계 없이 `INSERT`나 `REPLACE` 문장에서 `AUTO_INCREMENT` 값을 가져오는 순간에만 락이 걸렸다가 즉시 해제된다. (`AUTO_INCREMENT`에 명시적으로 값을 지정해도 자동 증가 락이 걸리게 된다)
+
+- 아주 짧은 순간에만 락이 걸렸다가 해제되는 잠금이라 문제가 되진 않지만 작동 방식을 변경할 수 있다.
+    - innodb_autoinc_lock_mode=0
+        - 모든 INSERT 문장은 자동 증가 락을 사용한다.
+    - innodb_autoinc_lock_mode=1
+        - 단순한 1건 또는 여러건의 레코드를 MySQL 서버가 레코드의 건수를 정확하게 예측할 수 있는 경우에는 자동 증가 락을 사용하지 않고 래치(뮤텍스)를 이용해 처리한다. (이하 생략…)
+    - innodb_autoinc_lock_mode=2
+        - 자동 증가 락을 사용하지 않고, 래치(뮤텍스)를 사용한다. 동시 처리 성능이 향상되지만, 연속된 자동 증가 값을 보장하지 않는다.
+
+## 5.3.2 인덱스와 잠금
+
+앞서 innoDB는 레코드를 자체를 잠그는 것이 아닌 인덱스를 잠그는 방식이라고 했다.
+
+즉, 변경해야 할 레코드를 찾기 위해 검색한 인덱스의 레코드를 모두 락을 걸어야 한다.
+
+예를 들어 `UPDATE 문`을 살펴보자.
+
+- emp 테이블에는 first_name 컬럼에만 인덱스가 걸려있다.
+
+```sql
+mysql> SELECT COUNT(*) FROM emp WHERE first_name='Georgi';
++------+
+|  253 |
++------+
+
+mysql> SELECT COUNT(*) FROM emp WHERE first_name='Georgi' and last_name='Klassen';
++------+
+|    1 |
++------+
+
+mysql> UPDATE emp SET hire_date=NOW() WHERE first_name='Georgi' and last_name='Klassen';
+--- 1건의 레코드 업데이트
+```
+
+과연 `단 1건`의 데이터를 변경하기 위한 UPDATE 쿼리를 실행했을 때 `락`이 걸리는 레코드는 몇개일까?
+
+바로 253개의 레코드이다. 
+
+<aside>
+💡 왜 253개인가?
+앞서 InnoDB 스토리지 엔진은 **인덱스를 잠그는 방식의 락**을 제공한다고 했다.
+UPDATE 문의 WHERE 절에 쓰인 두 컬럼(first_name, last_name) 모두 인덱스가 걸려있지 않았다.
+즉, first_name만 걸려있기 때문에 `first_name=’Georgi’` 레코드가 모두 잠기는 것이다.
+
+</aside>
+
+- 만약 인덱스가 하나도 없었다면?
+    
+    테이블 풀 스캔하면서 몇천..몇억개의 모든 레코드를 잠그게 된다. 
+    
+    이것이 바로 MySQL 만의 방식이며 InnoDB에서 인덱스 설계가 중요한 이유이다.
+    
+    where절에 자주 들어가는 컬럼에 인덱스를 거는 식으로 많이 사용한다. (where절에 두 컬럼이 쓰이는데 하나만 걸면 의미 없다)
+    
+
+## 5.3.3 레코드 수준의 잠금 확인 및 해제
+
+InnoDB 스토리지 엔진의 레코드 수준 잠금은 테이블 수준 잠금보다는 조금 더 복잡하다. 테이블 잠금은 대상 테이블이 잠겼는지 쉽게 파악이 되지만, 레코드 잠금은 잘 안쓰이는 레코드가 잠기면 한참동안이나 잠겨있는 상태로 남아있는 경우가 있다. (강제로 종료하려면 KILL 명령어를 사용하자)
+
+다음 시나리오를 보면서 잠금에 대해서 이해해보자.
+
+```sql
+connection 1:
+	BEGIN;
+	UPDATE emp SET hire_date=NOW() WHERE emp_no=100;
+	
+	connection 2:
+		UPDATE emp SET hire_date=NOW() WHERE emp_no=100;
+
+		connection 3:
+			UPDATE emp SET hire_date=NOW() WHERE emp_no=100;
+```
+
+MySQL 8.0부터는 `performance_schema`의 `data_locks`와 `data_lock_waits` 테이블을 이용해 트랜잭션이 어떤 잠금을 기다리고 있는지, 기다리고 있는 잠금은 어떤 트랜잭션을 가지고 있는지 확인할 수 있다.
+
+```sql
+mysql> SHOW PROCESSLIST;
+```
+
+| id | time | state | info |
+| --- | --- | --- | --- |
+| 17 | 607 |  | NULL |
+| 18 | 22 | updating | UPDATE emp SET hire_date=NOW() WHERE emp_no=100 |
+| 19 | 21 | updating | UPDATE emp SET hire_date=NOW() WHERE emp_no=100 |
+- 17번 스레드는 UPDATE를 실행 후 커밋을 하지 않은 상태이다. 여전히 잠금을 가지고 있는 상태이다.
+- 18번 스레드는 17번 스레드를, 19번 스레드는 18번 스레드를 기다리고 있다.
+    - 19번 스레드는 결국 17번과 18번 스레드를 기다리는 것이다.
+    - 정확한 정보를 확인하기 위해서는 p.174를 참고하자.
+
+# 5.4 MySQL의 격리 수준
+
+트랜잭션의 격리 수준(isolation level)이란 여러 트랜잭션이 동시에 처리될 때 특정 트랜잭션이 다른 트랜잭션에서 변경하거나 조회하는 데이터를 볼 수 있게 허용할지 말지를 결정하는 것이다.
+
+크게 4가지로 나뉜다.
+
+1. READ UNCOMMITED (=DIRTY READ)
+    - 거의 사용하지 않는다.
+2. READ COMMITED
+    - Oracle 같은 DBMS에서 주로 사용
+3. REPEATABLE READ
+    - MySQL에서 사용
+4. SERIALIZABLE
+    - 동시성이 중요한 데이터베이스에서는 거의 사용되지 않는다.
+
+아래로 내려갈 수록 트랜잭션 간 데이터 격리(고립) 정도가 높아지며, 동시 처리 성능은 낮아진다.
+
+하지만, SERIALIZABLE이 아닌 나머지 3개는 크게 성능의 개선이나 저하는 발생하지 않는다.
+
+## 5.4.1 READ UNCOMMITED
+
+각 트랜잭션에서의 변경 내용이 `COMMIT, ROLLBACK 여부에 상관없이` 다른 트랜잭션에서 보인다.
+
+- A 트랜잭션에서 새로운 레코드를 추가하고 commit을 하기 전인데도 B 트랜잭션에서는 새로운 데이터를 조회할 수 있다.
+- 하지만, 문제는 A 트랜잭션이 롤백이 되었을 경우이다. B 트랜잭션에서는 해당 데이터가 정상적이라 판단하고 추후 데이터 처리를 할 것이기 때문이다.
+
+데이터가 사라졌다 보였다하는 이러한 현상을 더티 리드(Dirty read)라고 한다.
+
+절대 사용되어선 안되는 격리 수준이다.
+
+## 5.4.2 READ COMMITED (NON-REPEATABLE READ)
+
+온라인 서비스에서 가장 많이 선택되는 격리 수준이다. 더티 리드 현상은 여기서 절대 발생하지 않는다.
+
+어떤 데이터든 `COMMIT이 완료된 데이터`만 다른 트랜잭션에서 보이기 때문이다.
+
+![Untitled](./images/5.3.png)
+
+- COMMIT 하기 전까지는 실제 데이터를 가져오는 방식이 아닌, 언두 로그에 있는 데이터를 가져온다.
+- COMMIT이 완료된 이후에는 실제 데이터를 가져오게 된다.
+- 여기서 문제가 발생하게 되는데..
+    - 한 트랜잭션에서 동일한 SELECT는 동일한 결과를 내야한다는 `REPEATABLE READ 정합성`에 어긋난다.
+
+<aside>
+💡 트랜잭션 내에서 실행되는 SELECT와 트랜잭션 없이 실행되는 SELECT의 차이를 혼동하지 말자.
+→ READ COMMITED 격리 수준에서는 둘의 차이가 별로 없다.
+→ 하지만, REAPEABLE READ 격리 수준에서는 기본적으로 SELECT 문장도 트랜잭션 범위 내에서만 작동한다.
+
+</aside>
+
+## 5.4.3 REPEATABLE READ
+
+MySQL의 InnoDB 스토리지 엔진에 **기본적으로 사용되는 격리 수준**이다. 바이너리 로그를 가진 MySQL에서는 최소 `REPEATABLE READ` 격리 수준 **이상**을 사용해야 한다.
+
+REPEATABLE READ 격리 수준에서는 다음과 같은 특징이 있다.
+
+- READ COMMITED 격리수준에서 발생한 데이터 조회의 부정합이 발생하지 않는다.
+- `MVCC(Multi Version Concurrency Control)` 을 이용해서 언두 로그에 백업한 데이터를 이용해 동일한 결과를 보장하는 것이다. (MVCC 설명은 4.2.3 절 확인)
+- READ COMMITED와 차이점은 언두 영역에 백업된 레코드의 여러 버전 가운데 몇번째 이전 버전까지 찾아 들어가는지에 차이가 있다.
+
+### 트랜잭션과 MVCC에 대해서..
+
+모든 InnoDB의 트랜잭션은 고유한 트랜잭션 번호(순차적으로 증가하는 값)를 가진다. 언두 영역에는 백업된 모든 레코드에는 변경을 발생시킨 트랜잭션의 번호가 포함되어있다. (아래 참조)
+
+```sql
++--------+--------+---------+
+| TRX-ID | field1 | field 2 |
++--------+--------+---------+
+|   6    | 10000  |  test1  |
++--------+--------+---------+
+|   12   | 50000  |  test9  |
++--------+--------+---------+
+```
+
+언두 영역의 백업된 데이터는 InnoDB 스토리지 엔진이 불필요하다고 판단한 시점에 **주기적으로 삭제**를 한다.
+
+`REPEATABLE READ` 격리 수준에서는 `MVCC`를 보장하기 위해 실행중인 트랜잭션 가운데 가장 오래된 트랜잭션 번호보다 트랜잭션 번호가 앞선 언두 영역의 데이터는 삭제할 수가 없다.
+
+### REPEATABLE READ 작동 방식
+
+아래 그림은 REPEATABLE READ 작동 방식을 보여준다.
+
+![Untitled](./images/5.1.png)
+
+1. 10번(트랜잭션)이 SELECT를 실행했다.
+2. 이후 12번(트랜잭션)이 Lara → Toto로 변경을 했다.
+    1. 변경되기 전 데이터는 언두로그에 백업된다.
+3. 12번(트랜잭션)이 커밋을 했다.
+4. 10번(트랜잭션)이 다시 Lara를 조회했다.
+    1. 여기서 만약, 커밋된 데이터가 조회되면? REPEATABLE READ의 데이터 정합성에 어긋나게 된다.
+    2. 사실 조회할 수도 없다. REPEATABLE READ 격리 수준에서는 ***자신의 트랜잭션 번호보다 같거나 작은 트랜잭션 번호의 데이터*** 만 볼 수 있게 된다. **(중요!)**
+5. 그렇기 때문에 언두로그에 백업된 데이터를 반환하게 된다.
+
+### PHANTOM READ (PHANTOM ROW)
+
+<aside>
+💡 팬텀 리드(또는 팬텀 로우)는 다른 트랜잭션에서 수행한 변경 작업에 의해 데이터가 보였다 안 보였다 하는 현상을 의미한다.
+
+</aside>
+
+아래 시나리오를 살펴보자.
+
+![Untitled](./images/5.2.png)
+
+1. 10번 트랜잭션이 emp_no가 50000 이상인 값을 조회하고 있다. (1건 조회)
+2. 12번 트랜잭션이 50001번의 데이터를 추가하고 커밋을 했다.
+3. 10번 트랜잭션이 똑같이 SELECT를 했다.
+    1. 이때 원래 같았으면 언두로그에 있는 값을 가져와서 이전처럼 1건의 데이터만 조회해와야 한다. 하지만 12번 트랜잭션이 추가한 데이터까지 총 2개의 조회 결과가 반환이 된다.
+
+왜 이런 상황이 발생할까?
+
+<aside>
+💡 SELECT … FOR UPDATE란?
+
+단순 SELECT가 아닌, 데이터를 변경하기 위한 조회를 한다고 명시하는 것이다.
+그렇기 때문에 조회와 동시에 해당 레코드에 LOCK을 걸게 된다.
+
+</aside>
+
+언두 레코드에는 잠금을 걸 수 없다. 그렇기 때문에 `SELECT … FOR UPDATE`, `SELECT … LOCK IN SHARE MODE`로 조회되는 레코드는 언두 영역의 변경 전 데이터를 잠금할 수 없기 때문에 현재 레코드의 값(잠금 없이)을 가져오게 되는 것이다. → ***제대로 파악해서 작성하기.***
+
+[SELECT FOR UPDATE vs LOCK IN SHARE MODE](https://velog.io/@sangmin7648/SELECT-FOR-UPDATE-vs-LOCK-IN-SHARE-MODE)
+
+## 5.4.4 SERIALIZABLE
+
+- 가장 단순하고 엄격한 격리 수준이다.
+- 4가지 격리수준에서 동시 처리 성능이 제일 떨어진다.
+- 순수한 SELECT 조회도 잠금을 걸게 된다.
+    - 그렇기 때문에 PHANTOM READ가 발생하지 않게 된다.
+
+<aside>
+💡 그렇다면 PHANTOM READ 때문이라도 SERIALIZABLE 격리 수준을 택해야 할까?
+
+→ InnoDB 스토리지 엔진에서는 갭 락, 넥스트 키 락 덕분에 REPEATABLE READ 격리 수준에서도 이미 PHANTOM READ가 *발생하지 않기 때문에 굳이 SERIALIZABLE을 사용할 필요성은 없다.
+
+</aside>
+
+*물론 위에서 설명한 `SELECT … FOR UPDATE`, `SELECT … LOCK IN SHARE MODE` 쿼리같이 예외적인 상황은 제외하고 말이다.
