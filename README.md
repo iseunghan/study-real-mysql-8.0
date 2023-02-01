@@ -11,6 +11,8 @@
 
 | 챕터 | 주제 | 발표자 | 링크 | 발표일자 |
 | - | - | - | - | - |
-| ch4.1 | MySQL 엔진 아키텍처 | [SHLee](https://github.com/iseunghan), [HDLee](https://github.com/Virtual-HDL) | [🔗-1](https://github.com/iseunghan/study-real-mysql-8.0/blob/main/ch4.MySQL%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/4.1.MySQL%EC%97%94%EC%A7%84-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/README-01.md), [🔗-2](https://github.com/iseunghan/study-real-mysql-8.0/blob/main/ch4.MySQL%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/4.1.MySQL%EC%97%94%EC%A7%84-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/README-02.md) | 23.01.07 |
-| ch4.2 | InnoDB 스토리지 엔진 아키텍처 | [SHLee](https://github.com/iseunghan), [HDLee](https://github.com/Virtual-HDL) |  | 23.01.14 |
-|  |  |  |  |  |
+| ch4 | 아키텍처 |  |  |  |
+|  | ch4.1 MySQL 엔진 아키텍처 | [SHLee](https://github.com/iseunghan), [HDLee](https://github.com/Virtual-HDL) | [🔗-1](https://github.com/iseunghan/study-real-mysql-8.0/blob/main/ch4.MySQL%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/4.1.MySQL%EC%97%94%EC%A7%84-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/README-01.md), [🔗-2](https://github.com/iseunghan/study-real-mysql-8.0/blob/main/ch4.MySQL%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/4.1.MySQL%EC%97%94%EC%A7%84-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/README-02.md) | 23.01.07 |
+|  | ch4.2 InnoDB 스토리지 엔진 아키텍처 | [SHLee](https://github.com/iseunghan), [HDLee](https://github.com/Virtual-HDL) | [🔗](https://github.com/iseunghan/study-real-mysql-8.0/tree/main/ch4.MySQL%20%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98/4.2InnoDB-%EC%8A%A4%ED%86%A0%EB%A6%AC%EC%A7%80-%EC%97%94%EC%A7%84-%EC%95%84%ED%82%A4%ED%85%8D%EC%B2%98) | 23.01.14 |
+| ch5 | 트랜잭션과 잠금 | [SHLee](https://github.com/iseunghan), [HDLee](https://github.com/Virtual-HDL) | [🔗](https://github.com/iseunghan/study-real-mysql-8.0/tree/main/ch5.%ED%8A%B8%EB%9E%9C%EC%9E%AD%EC%85%98%EA%B3%BC-%EC%9E%A0%EA%B8%88) | 23.01.29 |
+| ch8 | 인덱스 | [SHLee](https://github.com/iseunghan), [HDLee](https://github.com/Virtual-HDL) | | 23.02.02 |
